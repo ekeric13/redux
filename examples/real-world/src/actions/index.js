@@ -4,9 +4,13 @@ export const USER_REQUEST = 'USER_REQUEST'
 export const USER_SUCCESS = 'USER_SUCCESS'
 export const USER_FAILURE = 'USER_FAILURE'
 
+export const DOES_NOTHING_ONE = 'DOES_NOTHING_ONE';
+export const DOES_NOTHING_TWO = 'DOES_NOTHING_TWO';
+
 // Fetches a single user from Github API.
 // Relies on the custom API middleware defined in ../middleware/api.js.
 function fetchUser(login) {
+  console.log('fetching');
   return {
     [CALL_API]: {
       types: [ USER_REQUEST, USER_SUCCESS, USER_FAILURE ],
@@ -16,16 +20,50 @@ function fetchUser(login) {
   }
 }
 
+function doesNothingOne() {
+  return {
+    type: DOES_NOTHING_ONE
+  }
+}
+
+function doesNothingTwo() {
+  return {
+    type: DOES_NOTHING_TWO
+  }
+}
+
+function blocker() {
+  return function(dispatch) {   
+    console.log('blocking');
+    var firstPromise = new Promise((res, rej) =>{
+      window.setTimeout(()=>{
+        console.log('done blocking 1');
+        res( dispatch(doesNothingOne() ) );
+      }, 2000);
+    });
+    var secondPromise = new Promise((res, rej) =>{
+      window.setTimeout(()=>{
+        console.log('done blocking 2');
+        res( dispatch(doesNothingTwo() ) );
+      }, 4000);
+    });
+    return Promise.all([firstPromise, secondPromise])
+  }
+}
+
 // Fetches a single user from Github API unless it is cached.
 // Relies on Redux Thunk middleware.
 export function loadUser(login, requiredFields = []) {
-  return (dispatch, getState) => {
+  return async (dispatch, getState) => {
     const user = getState().entities.users[login]
     if (user && requiredFields.every(key => user.hasOwnProperty(key))) {
       return null
     }
 
-    return dispatch(fetchUser(login))
+    console.log('waiting');
+    await dispatch( blocker() );
+    dispatch(fetchUser(login));
+    console.log('finished waiting');
   }
 }
 
